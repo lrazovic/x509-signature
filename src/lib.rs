@@ -29,7 +29,7 @@
 //! of *ring* that require heap allocation, specifically RSA.  x509-signature
 //! should never panic on any input.
 
-#![cfg_attr(not(any(test, feature = "std")), no_std)]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(
     const_err,
     deprecated,
@@ -109,28 +109,28 @@ pub enum SignatureScheme {
 #[non_exhaustive]
 #[derive(Eq, PartialEq, Debug, Hash, Clone, Copy)]
 pub enum Error {
+    /// Invalid Der
+    BadDer,
+    /// Invalid Der time
+    BadDerTime,
+    /// Certificate has expired
+    CertExpired,
+    /// Certificate isn’t valid yet
+    CertNotValidYet,
+    /// Certificate expired before beginning to be valid
+    InvalidCertValidity,
+    /// Signature forged!
+    InvalidSignatureForPublicKey,
+    /// Signature algorithms don’t match
+    SignatureAlgorithmMismatch,
+    /// The issuer is not known.
+    UnknownIssuer,
     /// Version is not 3
     UnsupportedCertVersion,
     /// Signature algorithm unsupported
     UnsupportedSignatureAlgorithm,
     /// Signature algorithm isn’t valid for the public key
     UnsupportedSignatureAlgorithmForPublicKey,
-    /// Signature forged!
-    InvalidSignatureForPublicKey,
-    /// Signature algorithms don’t match
-    SignatureAlgorithmMismatch,
-    /// Invalid DER
-    BadDER,
-    /// Invalid DER time
-    BadDERTime,
-    /// Certificate isn’t valid yet
-    CertNotValidYet,
-    /// Certificate has expired
-    CertExpired,
-    /// Certificate expired before beginning to be valid
-    InvalidCertValidity,
-    /// The issuer is not known.
-    UnknownIssuer,
 }
 
 #[cfg(feature = "webpki")]
@@ -151,33 +151,45 @@ pub struct X509Certificate<'a> {
 
 impl<'a> X509Certificate<'a> {
     /// The tbsCertificate, signatureAlgorithm, and signature
-    pub fn das(&self) -> DataAlgorithmSignature<'a> { self.das }
+    pub fn das(&self) -> DataAlgorithmSignature<'a> {
+        self.das
+    }
 
     /// The serial number. Big-endian and non-empty. The first byte is
     /// guaranteed to be non-zero.
-    pub fn serial(&self) -> &'a [u8] { self.serial }
+    pub fn serial(&self) -> &'a [u8] {
+        self.serial
+    }
 
     /// The X.509 issuer. This has not been validated and is not trusted. In
     /// particular, it is not guaranteed to be valid ASN.1 DER.
-    pub fn issuer(&self) -> &'a [u8] { self.issuer }
+    pub fn issuer(&self) -> &'a [u8] {
+        self.issuer
+    }
 
     /// The earliest time, in seconds since the Unix epoch, that the certificate
     /// is valid.
     ///
     /// Will always be between [`MIN_ASN1_TIMESTAMP`] and
     /// [`MAX_ASN1_TIMESTAMP`], inclusive.
-    pub fn not_before(&self) -> ASN1Time { self.not_before }
+    pub fn not_before(&self) -> ASN1Time {
+        self.not_before
+    }
 
     /// The latest time, in seconds since the Unix epoch, that the certificate
     /// is valid.
     ///
     /// Will always be between [`MIN_ASN1_TIMESTAMP`] and
     /// [`MAX_ASN1_TIMESTAMP`], inclusive.
-    pub fn not_after(&self) -> ASN1Time { self.not_after }
+    pub fn not_after(&self) -> ASN1Time {
+        self.not_after
+    }
 
     /// X.509 subject. This has not been validated and is not trusted. In
     /// particular, it is not guaranteed to be valid ASN.1 DER.
-    pub fn subject(&self) -> &'a [u8] { self.subject }
+    pub fn subject(&self) -> &'a [u8] {
+        self.subject
+    }
 
     /// The subjectPublicKeyInfo, encoded as ASN.1 DER. There is no guarantee
     /// that the OID or public key are valid ASN.1 DER, but if they are not,
@@ -187,7 +199,9 @@ impl<'a> X509Certificate<'a> {
     }
 
     /// An iterator over the certificate’s extensions.
-    pub fn extensions(&self) -> ExtensionIterator<'a> { self.extensions }
+    pub fn extensions(&self) -> ExtensionIterator<'a> {
+        self.extensions
+    }
 
     /// Verify a signature made by the certificate.
     pub fn check_signature(
@@ -255,16 +269,24 @@ impl<'a> X509Certificate<'a> {
 
     /// Check if a certificate is currently valid.
     #[cfg(feature = "std")]
-    pub fn valid(&self) -> Result<(), Error> { self.valid_at_timestamp(ASN1Time::now()?.into()) }
+    pub fn valid(&self) -> Result<(), Error> {
+        self.valid_at_timestamp(ASN1Time::now()?.into())
+    }
 
     /// The tbsCertficate
-    pub fn tbs_certificate(&self) -> &[u8] { self.das.data() }
+    pub fn tbs_certificate(&self) -> &[u8] {
+        self.das.data()
+    }
 
     /// The `AlgorithmId` of the algorithm used to sign this certificate
-    pub fn signature_algorithm_id(&self) -> &[u8] { self.das.algorithm() }
+    pub fn signature_algorithm_id(&self) -> &[u8] {
+        self.das.algorithm()
+    }
 
     /// The signature of the certificate
-    pub fn signature(&self) -> &[u8] { self.das.signature() }
+    pub fn signature(&self) -> &[u8] {
+        self.das.signature()
+    }
 
     /// Verify that this certificate was signed by `cert`’s secret key.
     ///
@@ -288,27 +310,33 @@ impl<'a> X509Certificate<'a> {
     /// Check that this certificate is self-signed. This does not check that the
     /// subject and issuer are equal.
     #[deprecated(since = "0.3.3", note = "Use check_self_issued instead")]
-    pub fn check_self_signature(&self) -> Result<(), Error> { self.check_signature_from(self) }
+    pub fn check_self_signature(&self) -> Result<(), Error> {
+        self.check_signature_from(self)
+    }
 
     /// Check that this certificate is self-signed, and that the subject and
     /// issuer are equal.
-    pub fn check_self_issued(&self) -> Result<(), Error> { self.check_issued_by(self) }
+    pub fn check_self_issued(&self) -> Result<(), Error> {
+        self.check_issued_by(self)
+    }
 }
 
 /// Extracts the algorithm id and public key from a certificate
-pub fn parse_certificate<'a>(certificate: &'a [u8]) -> Result<X509Certificate<'a>, Error> {
+pub fn parse_certificate(certificate: &[u8]) -> Result<X509Certificate<'_>, Error> {
     use core::convert::TryFrom as _;
     let das = DataAlgorithmSignature::try_from(certificate)?;
-    untrusted::Input::from(&*das.inner()).read_all(Error::BadDER, |input| {
+    untrusted::Input::from(&*das.inner()).read_all(Error::BadDer, |input| {
         // We require extensions, which means we require version 3
-        if input.read_bytes(5).map_err(|_| Error::BadDER)?
+        if input
+            .read_bytes(5)
+            .map_err(|_| Error::BadDer)?
             != untrusted::Input::from(&[160, 3, 2, 1, 2])
         {
             return Err(Error::UnsupportedCertVersion);
         }
         // serialNumber
         let serial = der::positive_integer(input)
-            .map_err(|_| Error::BadDER)?
+            .map_err(|_| Error::BadDer)?
             .big_endian_without_leading_zero();
         // signature
         if das::read_sequence(input)?.as_slice_less_safe() != das.algorithm() {
@@ -319,7 +347,7 @@ pub fn parse_certificate<'a>(certificate: &'a [u8]) -> Result<X509Certificate<'a
         let issuer = das::read_sequence(input)?.as_slice_less_safe();
         // validity
         let (not_before, not_after) =
-            der::nested(input, der::Tag::Sequence, Error::BadDER, |input| {
+            der::nested(input, der::Tag::Sequence, Error::BadDer, |input| {
                 Ok((time::read_time(input)?, time::read_time(input)?))
             })?;
         if not_before > not_after {
@@ -331,10 +359,10 @@ pub fn parse_certificate<'a>(certificate: &'a [u8]) -> Result<X509Certificate<'a
 
         let extensions = if !input.at_end() {
             let tag = der::Tag::ContextSpecificConstructed3;
-            der::nested(input, tag, Error::BadDER, |input| {
-                der::nested(input, der::Tag::Sequence, Error::BadDER, |input| {
+            der::nested(input, tag, Error::BadDer, |input| {
+                der::nested(input, der::Tag::Sequence, Error::BadDer, |input| {
                     if input.at_end() {
-                        return Err(Error::BadDER);
+                        return Err(Error::BadDer);
                     }
                     Ok(ExtensionIterator(SequenceIterator::read(input)))
                 })
