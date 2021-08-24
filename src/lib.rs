@@ -330,7 +330,8 @@ pub fn parse_certificate(certificate: &[u8]) -> Result<X509Certificate<'_>, Erro
         if input
             .read_bytes(5)
             .map_err(|_| Error::BadDer)?
-            != untrusted::Input::from(&[160, 3, 2, 1, 2])
+            .as_slice_less_safe()
+            != untrusted::Input::from(&[160, 3, 2, 1, 2]).as_slice_less_safe()
         {
             return Err(Error::UnsupportedCertVersion);
         }
